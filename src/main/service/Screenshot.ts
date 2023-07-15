@@ -131,15 +131,17 @@ function createTextOcrWin(): void {
       contextIsolation: false
     }
   })
-  ScreenshotsMain.textOcrWin.hide()
+  // ScreenshotsMain.textOcrWin.hide()
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     ScreenshotsMain.textOcrWin.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/textOcr.html`)
   } else {
     ScreenshotsMain.textOcrWin.loadFile(path.join(__dirname, '../renderer/textOcr.html'))
   }
 
-  // 打开开发者工具
-  // ScreenshotsMain.textOcrWin.webContents.openDevTools({ mode: 'detach' })
+  ScreenshotsMain.textOcrWin.on('ready-to-show', () => {
+    // 打开开发者工具
+    ScreenshotsMain.textOcrWin.webContents.openDevTools({ mode: 'detach' })
+  })
 
   // 当 window 被关闭，这个事件会被触发。
   ScreenshotsMain.textOcrWin.on('closed', () => {

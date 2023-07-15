@@ -7,45 +7,88 @@ const ort = require('onnxruntime-node')
 const fs = require('fs')
 const WordsNinjaPack = require('wordsninja')
 const WordsNinja = new WordsNinjaPack()
+const lo = require('esearch-ocr') as typeof import('esearch-ocr')
 
 const ipcRenderer = electronAPI.ipcRenderer
 ipcRenderer.on('local-ocr', async (_event, imgByBase64) => {
-  localOcrFun(imgByBase64, (_err, text) => {
-    ipcRenderer.invoke('text-ocr-event', text)
+  localOcrFun(imgByBase64, (_err, res) => {
+    console.log('text = ', res)
+    ipcRenderer.invoke('text-ocr-event', res.text)
   })
 })
+
 async function localOcrFun(imgByBase64, callback): Promise<void> {
-  // 默认模型路径
-  let ocrPath
-  if (EnvEnum.isPro()) {
-    ocrPath = path.join(__dirname, '../../../app.asar.unpacked/ocr/')
-  } else {
-    ocrPath = path.join(__dirname, '../../ocr/')
-  }
-  const detPath = path.join(ocrPath, 'ocr_det.onnx'),
-    recPath = path.join(ocrPath, 'ocr_rec.onnx'),
-    dictPath = path.join(ocrPath, 'ocr_keys_v1.txt')
-  // 初始化
-  await init(detPath, recPath, dictPath)
-  const img = document.createElement('img')
-  img.src = imgByBase64
-  img.onload = async (): Promise<void> => {
-    const canvas = document.createElement('canvas')
-    canvas.width = img.width
-    canvas.height = img.height
-    const context = canvas.getContext('2d')
-    if (null == context) {
-      return
+  try {
+    // 默认模型路径
+    let ocrPath
+    if (EnvEnum.isPro()) {
+      ocrPath = path.join(__dirname, '../../../app.asar.unpacked/ocr/')
+    } else {
+      ocrPath = path.join(__dirname, '../../ocr/')
     }
-    context.drawImage(img, 0, 0)
-    ocr(context.getImageData(0, 0, img.width, img.height))
-      .then((text) => {
-        callback(null, text)
-      })
-      .catch((e) => {
-        callback(e, null)
-      })
+    // path.join(ocrPath, 'ocr_keys_v1.txt')
+    const detPath = path.join(ocrPath, 'ocr_det.onnx'),
+      recPath = path.join(ocrPath, 'ocr_rec.onnx'),
+      dictPath = fs.readFileSync(path.join(ocrPath, 'ocr_keys_v1.txt')).toString()
+    await lo.init({
+      detPath: detPath,
+      recPath: recPath,
+      dic: dictPath,
+      node: true,
+      detShape: [960, 960]
+    })
+
+    const img = document.createElement('img')
+    img.src = imgByBase64
+    img.onload = async (): Promise<void> => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      // @ts-ignore
+      canvas.getContext('2d').drawImage(img, 0, 0)
+      // @ts-ignore
+      lo.ocr(canvas.getContext('2d').getImageData(0, 0, img.width, img.height))
+        .then((l) => {
+          console.log(l)
+          let t = ''
+          for (const i of l) {
+            t += i.text + '\n'
+          }
+          const ll = []
+          for (const i of l) {
+            // @ts-ignore
+            ll.push({ box: i.box, text: i.text })
+          }
+          callback(null, { raw: ll, text: t })
+        })
+        .catch((e) => {
+          callback(e, null)
+        })
+    }
+  } catch (error) {
+    callback(error, null)
   }
+  // 初始化
+  // await init(detPath, recPath, dictPath)
+  // const img = document.createElement('img')
+  // img.src = imgByBase64
+  // img.onload = async (): Promise<void> => {
+  //   const canvas = document.createElement('canvas')
+  //   canvas.width = img.width
+  //   canvas.height = img.height
+  //   const context = canvas.getContext('2d')
+  //   if (null == context) {
+  //     return
+  //   }
+  //   context.drawImage(img, 0, 0)
+  //   ocr(context.getImageData(0, 0, img.width, img.height))
+  //     .then((text) => {
+  //       callback(null, text)
+  //     })
+  //     .catch((e) => {
+  //       callback(e, null)
+  //     })
+  // }
 }
 
 let det, rec, dict
