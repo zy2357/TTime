@@ -73,7 +73,7 @@ function createWindow(): void {
     // 设置窗口透明色
     backgroundColor: '#0000',
     // 去除窗口边框
-    frame: false,
+    frame: true,
     // 可调整大小
     resizable: true,
     // 默认不显示
